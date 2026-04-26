@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel – My Green Pen</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #312e81; --primary-h: #4338ca;
+  --success: #10b981; --danger: #ef4444;
+  --warning: #f59e0b;
+  --bg: #f1f5f9; --card: #fff;
+  --text: #1e293b; --muted: #64748b;
+  --border: #e2e8f0;
+  --font: 'Noto Sans Tamil', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+body { background: var(--bg); color: var(--text); padding: 16px; min-height: 100vh; }
+
+.container { max-width: 900px; margin: 0 auto; }
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  color: #fff; padding: 20px 24px;
+  border-radius: 16px 16px 0 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header h1 { font-size: 20px; font-weight: 800; }
+.header-sub { font-size: 12px; opacity: 0.75; margin-top: 3px; }
+
+/* Cards */
+.card {
+  background: var(--card); padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-top: none; margin-bottom: 0;
+}
+.card:last-child { border-radius: 0 0 16px 16px; }
+.section-title {
+  font-size: 13px; font-weight: 800; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase;
+  padding-bottom: 12px; margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Form */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.form-control {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 13px;
+  font-family: var(--font); outline: none;
+  background: #f8fafc; color: var(--text);
+  transition: border 0.2s, background 0.2s;
+}
+.form-control:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(49,46,129,0.08); }
+.help { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+/* File selector */
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.file-card {
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.file-card:hover  { border-color: #a5b4fc; background: #f5f3ff; }
+.file-card.active { border-color: var(--primary); background: #eef2ff; }
+.file-card input  { margin-top: 2px; accent-color: var(--primary); flex-shrink: 0; }
+.file-card-info strong { font-size: 12px; font-weight: 800; color: var(--text); display: block; }
+.file-card-info span  { font-size: 11px; color: var(--muted); }
+
+/* Custom path */
+.custom-path-wrap { margin-top: 4px; display: none; }
+.custom-path-wrap.show { display: block; }
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  padding: 10px 18px; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font); transition: opacity 0.2s, transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn:hover  { opacity: 0.88; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-slate   { background: #64748b; color: #fff; }
+.btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+
+/* Editor */
+.editor-wrap { position: relative; }
+#jsonEditor {
+  width: 100%; height: 460px;
+  padding: 14px; font-family: 'Courier New', monospace;
+  font-size: 13px; border: 1.5px solid var(--border);
+  border-radius: 10px; resize: vertical;
+  background: #f8fafc; line-height: 1.6; outline: none;
+  color: var(--text);
+  transition: border 0.2s;
+}
+#jsonEditor:focus { border-color: var(--primary); background: #fff; }
+
+/* Status */
+.status-box {
+  padding: 10px 14px; border-radius: 8px;
+  font-size: 13px; font-weight: 700;
+  display: none; margin-top: 12px;
+  animation: fadeIn 0.2s ease;
+}
+.status-box.show-ok  { display: flex; align-items: center; gap: 8px; background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.status-box.show-err { display: flex; align-items: center; gap: 8px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.status-box.show-info{ display: flex; align-items: center; gap: 8px; background: #e0e7ff; color: var(--primary); border: 1px solid #a5b4fc; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+
+/* Info bar */
+.info-bar {
+  background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 12px; color: #92400e; font-weight: 600;
+  margin-bottom: 16px; line-height: 1.6;
+}
+
+/* JSON format guide */
+.format-guide {
+  background: #f8fafc; border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px;
+  font-size: 11px; color: var(--muted);
+  font-family: monospace; line-height: 1.7;
+  margin-top: 8px; white-space: pre-wrap; word-break: break-all;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>⚙️ Admin Panel – My Green Pen</h1>
+      <div class="header-sub">GitHub JSON தரவு மேலாண்மை</div>
+    </div>
+    <div style="font-size:12px;opacity:0.7;text-align:right;">
+      index.html<br>material.html<br>quiz.html
+    </div>
+  </div>
+
+  <!-- SECTION 1: GitHub Credentials -->
+  <div class="card">
+    <div class="section-title">🔑 1. GitHub நற்சான்றுகள்</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>GitHub Username (Owner)</label>
+        <input type="text" id="ghOwner" class="form-control" placeholder="உதா: myusername" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="form-group">
+        <label>Repository Name</label>
+        <input type="text" id="ghRepo"  class="form-control" placeholder="உதா: greenpen-data" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Personal Access Token (PAT)</label>
+        <input type="password" id="ghToken" class="form-control" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <div class="help">GitHub → Settings → Developer settings → Personal access tokens (classic) → New token → repo ✅ மட்டும் தேர்வு செய்யவும்</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: File Selection -->
+  <div class="card">
+    <div class="section-title">📁 2. கோப்பு தேர்வு (File Path)</div>
+
+    <div class="info-bar">
+      💡 கோப்பு பெயர் format: <strong>data/{பாடம்}_{வகுப்பு}_{பருவம்}.json</strong><br>
+      உதா: <strong>data/tamil_c5_t1.json</strong> = தமிழ் 5ஆம் வகுப்பு பருவம் 1
+    </div>
+
+    <div class="file-grid" id="fileGrid">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="custom-path-wrap" id="customWrap">
+      <div class="form-group">
+        <label>Custom File Path</label>
+        <input type="text" id="customPath" class="form-control" placeholder="data/tamil_c4_t2.json">
+        <div class="help">data/ என்று ஆரம்பிக்கவும். உதா: data/english_c3_t1.json</div>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="fetchJSON()">⬇️ JSON Load செய்</button>
+    </div>
+    <div class="status-box" id="fetchStatus"></div>
+  </div>
+
+  <!-- SECTION 3: JSON Editor -->
+  <div class="card">
+    <div class="section-title">✏️ 3. JSON திருத்தி (Editor)</div>
+
+    <div class="btn-row" style="margin-bottom:12px;">
+      <button class="btn btn-slate" onclick="formatJSON()">✨ Format JSON</button>
+      <button class="btn btn-outline" onclick="validateJSON()">✅ Validate</button>
+      <button class="btn btn-outline" onclick="insertTemplate()">📋 Template செருகு</button>
+    </div>
+
+    <div class="editor-wrap">
+      <textarea id="jsonEditor" placeholder="JSON தரவுகள் இங்கே தோன்றும்... Load செய்த பிறகு திருத்தவும்."></textarea>
+    </div>
+
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-success" onclick="commitJSON()">☁️ GitHub-ல் சேமி (Commit)</button>
+    </div>
+    <div class="status-box" id="saveStatus"></div>
+  </div>
+
+  <!-- SECTION 4: Format Reference -->
+  <div class="card">
+    <div class="section-title">📖 4. JSON Format வழிகாட்டி</div>
+    <div class="format-guide">[
+  {
+    "id": "tam_5_t1_l1",          ← unique id (பாடம் குறியீடு)
+    "title": "1. பாடம் பெயர்",     ← பட்டியலில் காட்டும் பெயர்
+    "material": [                  ← பாடக்குறிப்பு பகுதிகள்
+      {
+        "title": "பகுதி தலைப்பு",
+        "points": ["குறிப்பு 1", "குறிப்பு 2"]   ← simple bullets
+        // OR
+        "content": "&lt;div&gt;...HTML...&lt;/div&gt;"  ← rich HTML
+      }
+    ],
+    "quiz": [                      ← வினா-விடை பட்டியல்
+      {
+        "q": "வினா உரை?",
+        "opts": ["விடை அ", "விடை ஆ", "விடை இ", "விடை ஈ"],
+        "ans": 0,                  ← சரியான விடையின் index (0=அ, 1=ஆ...)
+        "expl": "விளக்கம் உரை"
+      }
+    ]
+  }
+]</div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  PRE-DEFINED FILE LIST
+// ═══════════════════════════════════════════════════
+var FILES = [
+  { path:'data/tamil_c5_t1.json',      label:'தமிழ் வகுப்பு 5 பருவம் 1',    icon:'📖' },
+  { path:'data/tamil_c5_t2.json',      label:'தமிழ் வகுப்பு 5 பருவம் 2',    icon:'📖' },
+  { path:'data/tamil_c5_t3.json',      label:'தமிழ் வகுப்பு 5 பருவம் 3',    icon:'📖' },
+  { path:'data/psychology.json',       label:'உளவியல்',                       icon:'🧠' },
+  { path:'data/revision_test.json',    label:'திருப்புதல் தேர்வு',            icon:'📝' },
+  { path:'data/tet_mock_test.json',    label:'TET மாதிரித் தேர்வு',           icon:'🏆' },
+  { path:'data/classes_678.json',      label:'6,7,8 வகுப்புகள்',              icon:'🏫' },
+  { path:'custom',                     label:'Custom Path...',                 icon:'✏️' }
+];
+
+var currentSHA = null;
+var selectedPath = FILES[0].path;
+
+// Render file cards
+(function renderFiles() {
+  var grid = document.getElementById('fileGrid');
+  grid.innerHTML = FILES.map(function(f, i) {
+    return '<label class="file-card' + (i===0?' active':'') + '" onclick="selectFile(\'' + f.path + '\',this)">'
+         + '<input type="radio" name="filePick" value="' + f.path + '"' + (i===0?' checked':'') + '>'
+         + '<div class="file-card-info">'
+         +   '<strong>' + f.icon + ' ' + f.label + '</strong>'
+         +   '<span>' + (f.path !== 'custom' ? f.path : 'நீங்களே தட்டச்சு செய்யவும்') + '</span>'
+         + '</div>'
+         + '</label>';
+  }).join('');
+})();
+
+function selectFile(path, el) {
+  selectedPath = path;
+  document.querySelectorAll('.file-card').forEach(function(c){ c.classList.remove('active'); });
+  el.classList.add('active');
+  var wrap = document.getElementById('customWrap');
+  wrap.classList.toggle('show', path === 'custom');
+}
+
+function getFilePath() {
+  return selectedPath === 'custom'
+    ? document.getElementById('customPath').value.trim()
+    : selectedPath;
+}
+
+// ═══════════════════════════════════════════════════
+//  BASE64 HELPERS
+// ═══════════════════════════════════════════════════
+function utf8_to_b64(str) { return window.btoa(unescape(encodeURIComponent(str))); }
+function b64_to_utf8(str) { return decodeURIComponent(escape(window.atob(str.replace(/\s/g,'')))); }
+
+function getGH() {
+  return {
+    owner: document.getElementById('ghOwner').value.trim(),
+    repo:  document.getElementById('ghRepo').value.trim(),
+    token: document.getElementById('ghToken').value.trim()
+  };
+}
+
+// ═══════════════════════════════════════════════════
+//  STATUS HELPERS
+// ═══════════════════════════════════════════════════
+function setStatus(elId, msg, type) {
+  var el = document.getElementById(elId);
+  el.textContent = msg;
+  el.className = 'status-box show-' + type;
+  if (type === 'ok') setTimeout(function(){ el.className='status-box'; }, 5000);
+}
+
+// ═══════════════════════════════════════════════════
+//  FETCH FROM GITHUB
+// ═══════════════════════════════════════════════════
+async function fetchJSON() {
+  var gh   = getGH();
+  var path = getFilePath();
+  if (!gh.owner || !gh.repo || !gh.token || !path) {
+    setStatus('fetchStatus', '⚠️ அனைத்து விவரங்களையும் நிரப்பவும்!', 'err'); return;
+  }
+  setStatus('fetchStatus', '⏳ GitHub-லிருந்து பெறுகிறது...', 'info');
+  var url = 'https://api.github.com/repos/' + gh.owner + '/' + gh.repo + '/contents/' + path;
+  try {
+    var res = await fetch(url, { headers: { 'Authorization':'token '+gh.token, 'Accept':'application/vnd.github.v3+json' }});
+    if (res.status === 404) {
+      currentSHA = null;
+      var template = getTemplate();
+      document.getElementById('jsonEditor').value = template;
+      setStatus('fetchStatus', 'ℹ️ கோப்பு இல்லை — புதிய template தயார்! திருத்தி சேமிக்கவும்.', 'info');
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    currentSHA = data.sha;
+    var content = b64_to_utf8(data.content);
+    document.getElementById('jsonEditor').value = content;
+    formatJSON();
+    setStatus('fetchStatus', '✅ கோப்பு வெற்றிகரமாக ஏற்றப்பட்டது! (' + path + ')', 'ok');
+  } catch(e) {
+    setStatus('fetchStatus', '❌ பிழை: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  FORMAT / VALIDATE
+// ═══════════════════════════════════════════════════
+function formatJSON() {
+  var ed = document.getElementById('jsonEditor');
+  try {
+    ed.value = JSON.stringify(JSON.parse(ed.value), null, 2);
+  } catch(e) {
+    setStatus('saveStatus', '❌ JSON வடிவம் தவறு: ' + e.message, 'err');
+  }
+}
+
+function validateJSON() {
+  try {
+    var parsed = JSON.parse(document.getElementById('jsonEditor').value);
+    if (!Array.isArray(parsed)) { setStatus('saveStatus', '❌ JSON array [ ] வடிவில் இருக்க வேண்டும்!', 'err'); return; }
+    var issues = [];
+    parsed.forEach(function(l, i) {
+      if (!l.id)       issues.push('பாடம் ' + (i+1) + ': id இல்லை');
+      if (!l.title)    issues.push('பாடம் ' + (i+1) + ': title இல்லை');
+      if (!l.material) issues.push('பாடம் ' + (i+1) + ': material இல்லை');
+      if (!l.quiz)     issues.push('பாடம் ' + (i+1) + ': quiz இல்லை');
+    });
+    if (issues.length > 0) {
+      setStatus('saveStatus', '⚠️ ' + issues.join(' | '), 'err');
+    } else {
+      setStatus('saveStatus', '✅ JSON சரியாக உள்ளது! ' + parsed.length + ' பாடங்கள் உள்ளன.', 'ok');
+    }
+  } catch(e) {
+    setStatus('saveStatus', '❌ JSON பிழை: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  INSERT TEMPLATE
+// ═══════════════════════════════════════════════════
+function getTemplate() {
+  return JSON.stringify([
+    {
+      "id": "subj_cls_term_l1",
+      "title": "1. பாடம் பெயர்",
+      "material": [
+        { "title": "முக்கிய குறிப்புகள்", "points": ["குறிப்பு 1", "குறிப்பு 2", "குறிப்பு 3"] },
+        { "title": "சொல்லர்த்தங்கள்",     "points": ["சொல் 1 — பொருள் 1", "சொல் 2 — பொருள் 2"] }
+      ],
+      "quiz": [
+        { "q": "கேள்வி 1?", "opts": ["விடை அ", "விடை ஆ", "விடை இ", "விடை ஈ"], "ans": 0, "expl": "விளக்கம்" },
+        { "q": "கேள்வி 2?", "opts": ["விடை அ", "விடை ஆ", "விடை இ", "விடை ஈ"], "ans": 1, "expl": "விளக்கம்" }
+      ]
+    }
+  ], null, 2);
+}
+function insertTemplate() {
+  if (document.getElementById('jsonEditor').value.trim() && !confirm('தற்போதைய உள்ளடக்கம் மாற்றப்படும். தொடரவா?')) return;
+  document.getElementById('jsonEditor').value = getTemplate();
+  setStatus('saveStatus', 'ℹ️ Template செருகப்பட்டது. id மற்றும் title-ஐ மாற்றவும்.', 'info');
+}
+
+// ═══════════════════════════════════════════════════
+//  COMMIT TO GITHUB
+// ═══════════════════════════════════════════════════
+async function commitJSON() {
+  var gh      = getGH();
+  var path    = getFilePath();
+  var content = document.getElementById('jsonEditor').value;
+
+  if (!gh.owner || !gh.repo || !gh.token || !path || !content) {
+    setStatus('saveStatus', '⚠️ அனைத்து விவரங்களும் மற்றும் JSON தரவும் தேவை!', 'err'); return;
+  }
+  try { JSON.parse(content); } catch(e) {
+    setStatus('saveStatus', '❌ JSON பிழை உள்ளது. சரிசெய்து சேமிக்கவும்: ' + e.message, 'err'); return;
+  }
+
+  var url      = 'https://api.github.com/repos/' + gh.owner + '/' + gh.repo + '/contents/' + path;
+  var bodyData = { message: 'Update ' + path + ' via Admin Panel', content: utf8_to_b64(content) };
+  if (currentSHA) bodyData.sha = currentSHA;
+
+  setStatus('saveStatus', '⏳ GitHub-ல் சேமிக்கப்படுகிறது...', 'info');
+
+  try {
+    var res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Authorization':'token '+gh.token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' },
+      body: JSON.stringify(bodyData)
+    });
+    if (!res.ok) { var err = await res.json(); throw new Error(err.message || 'Commit failed'); }
+    var resData = await res.json();
+    currentSHA = resData.content.sha;
+    setStatus('saveStatus', '✅ வெற்றிகரமாக சேமிக்கப்பட்டது! 🎉 (' + path + ')', 'ok');
+  } catch(e) {
+    setStatus('saveStatus', '❌ சேமிப்பில் பிழை: ' + e.message, 'err');
+  }
+}
+
+// Auto-fill from localStorage if available
+(function() {
+  document.getElementById('ghOwner').value = localStorage.getItem('gh_owner') || '';
+  document.getElementById('ghRepo').value  = localStorage.getItem('gh_repo')  || '';
+  document.getElementById('ghToken').value = localStorage.getItem('gh_token') || '';
+})();
+</script>
+</body>
+</html>

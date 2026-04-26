@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>My Green Pen – சிறப்பு ஆசிரியர் தகுதித்தேர்வு</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="index.css">
+<style>
+  .page { display: none; animation: fadeIn 0.25s ease; }
+  .page.show { display: block; }
+
+
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- HEADER -->
+  <div class="app-header">
+    <div style="width:100%;position:relative;z-index:2;">
+      <span class="bname">MY GREEN PEN</span>
+      <span class="bsub">சிறப்பு ஆசிரியர் தகுதித்தேர்வு</span>
+    </div>
+  </div>
+
+
+
+  <!-- SCROLLABLE PAGES -->
+  <div class="page-area" id="pageArea">
+
+    <!-- PAGE 1: SUBJECTS -->
+    <div class="page show" id="pg1">
+      <div class="sec-wrap">
+        <div class="sec-lbl">பாடத்தைத் தேர்ந்தெடுக்கவும்</div>
+        <div class="subj-grid" id="subjGrid"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: CLASSES -->
+    <div class="page" id="pg2">
+      <div class="subj-topbar">
+        <button class="back-btn" onclick="showPage(1)">&#8592;</button>
+        <div class="topbar-info">
+          <div class="topbar-lbl">சிறப்பு ஆசிரியர் தகுதித்தேர்வு</div>
+          <div class="topbar-name" id="p2Name">பாடம்</div>
+        </div>
+      </div>
+      <div class="menu-list-wrap">
+        <div class="sec-lbl" style="margin-bottom:12px;">வகுப்பைத் தேர்ந்தெடுக்கவும்</div>
+        <div id="classList"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: TERMS -->
+    <div class="page" id="pg3">
+      <div class="subj-topbar">
+        <button class="back-btn" onclick="showPage(2)">&#8592;</button>
+        <div class="topbar-info">
+          <div class="topbar-lbl" id="p3Lbl">பாடம்</div>
+          <div class="topbar-name" id="p3Name">வகுப்பு</div>
+        </div>
+      </div>
+      <div class="menu-list-wrap">
+        <div class="sec-lbl" style="margin-bottom:12px;">பருவத்தைத் தேர்ந்தெடுக்கவும்</div>
+        <div id="termList"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: LESSON INDEX -->
+    <div class="page" id="pg4">
+      <div class="subj-topbar">
+        <button class="back-btn" onclick="goBackFromIndex()">&#8592;</button>
+        <div class="topbar-info">
+          <div class="topbar-lbl" id="p4Lbl">பாடம்</div>
+          <div class="topbar-name" id="p4Name">பருவம்</div>
+        </div>
+      </div>
+      <div class="menu-list-wrap">
+        <div class="sec-lbl" style="margin-bottom:12px;">படிக்க வேண்டிய பாடங்கள்</div>
+        <div id="lessonList"></div>
+      </div>
+    </div>
+
+  </div><!-- end page-area -->
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="bnav-item active" id="bn1" onclick="showPage(1)">
+      <div class="bnav-icon">🏠</div>
+      <div class="bnav-lbl">முகப்பு</div>
+    </div>
+    <div class="bnav-item" id="bn2" onclick="showPage(1)">
+      <div class="bnav-icon">📚</div>
+      <div class="bnav-lbl">பாடங்கள்</div>
+    </div>
+    <div class="bnav-item" id="bn3" onclick="window.location.href='tel:6369371452'">
+      <div class="bnav-icon">📞</div>
+      <div class="bnav-lbl">Contact</div>
+    </div>
+    <div class="bnav-item" id="bn4" onclick="showPay()">
+      <div class="bnav-icon">💳</div>
+      <div class="bnav-lbl">Pay</div>
+    </div>
+  </div>
+
+  <!-- PAY MODAL -->
+  <div class="pay-modal-overlay" id="payModal">
+    <div class="pay-modal">
+      <div class="gpay-logo">💳</div>
+      <div class="pay-title">GPay மூலம் செலுத்த</div>
+      <div class="pay-desc">கீழே உள்ள எண்ணிற்கு GPay அல்லது PhonePe மூலம் செலுத்தவும்.</div>
+      <div class="pay-number" id="gpayNumber">8883464252</div>
+      <button class="copy-btn" onclick="copyGPay()">📋 எண்ணை Copy செய்</button>
+      <button class="close-pay-btn" onclick="hidePay()">✖ மூடுக</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div><!-- end app-wrapper -->
+
+<script>
+// ═══════════════════════════════════════════════════
+//  GitHub credentials — admin.html-ல் save செய்தவை
+//  localStorage-லிருந்து மட்டும் படிக்கும்
+//  இங்கே எந்த form / input-உம் இல்லை
+// ═══════════════════════════════════════════════════
+var GH = {
+  owner: localStorage.getItem('gh_owner') || '',
+  repo:  localStorage.getItem('gh_repo')  || '',
+  token: localStorage.getItem('gh_token') || ''
+};
+
+
+
+// ═══════════════════════════════════════════════════
+//  SUBJECTS
+//  prefix = உங்கள் file பெயரில் உள்ள குறுக்கெழுத்து
+//  உதா: tamil → tam, english → eng, maths → mat
+// ═══════════════════════════════════════════════════
+var SUBJECTS = [
+  { id:'tamil',        name:'தமிழ்',             icon:'📖', color:'#b91c1c', bg:'#fef2f2', type:'class',  prefix:'tam',  file:null },
+  { id:'english',      name:'ஆங்கிலம்',           icon:'🔤', color:'#0369a1', bg:'#e0f2fe', type:'class',  prefix:'eng',  file:null },
+  { id:'maths',        name:'கணிதம்',             icon:'🧮', color:'#047857', bg:'#ecfdf5', type:'class',  prefix:'mat',  file:null },
+  { id:'evs',          name:'சூழ்நிலையியல்',       icon:'🌿', color:'#854d0e', bg:'#fefce8', type:'class',  prefix:'evs',  file:null },
+  { id:'social',       name:'சமூக அறிவியல்',      icon:'🌍', color:'#4338ca', bg:'#e0e7ff', type:'class',  prefix:'soc',  file:null },
+  { id:'psychology',   name:'உளவியல்',             icon:'🧠', color:'#7e22ce', bg:'#faf5ff', type:'direct', prefix:'psy',  file:'data/psychology.json' },
+  { id:'classes_678',  name:'6, 7, 8 வகுப்புகள்', icon:'🏫', color:'#2563eb', bg:'#eff6ff', type:'direct', prefix:'c678', file:'data/classes_678.json' },
+  { id:'revision_test',name:'திருப்புதல் தேர்வு',  icon:'📝', color:'#c2410c', bg:'#ffedd5', type:'direct', prefix:'rev',  file:'data/revision_test.json' },
+  { id:'tet_mock_test',name:'TET மாதிரித் தேர்வு', icon:'🏆', color:'#0f766e', bg:'#e0f2fe', type:'direct', prefix:'tet',  file:'data/tet_mock_test.json' }
+];
+
+var CLASSES = [
+  {id:'c1',name:'வகுப்பு 1'},{id:'c2',name:'வகுப்பு 2'},
+  {id:'c3',name:'வகுப்பு 3'},{id:'c4',name:'வகுப்பு 4'},{id:'c5',name:'வகுப்பு 5'}
+];
+
+var TERMS = [
+  {id:'t1',name:'பருவம் 1'},{id:'t2',name:'பருவம் 2'},{id:'t3',name:'பருவம் 3'}
+];
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+var state = { subj:null, cls:null, term:null, lessonList:[], cache:{} };
+
+// ═══════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════
+function showPage(n) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('show'); });
+  document.getElementById('pg'+n).classList.add('show');
+  document.getElementById('pageArea').scrollTop = 0;
+  [1,2,3,4].forEach(function(i){
+    var b=document.getElementById('bn'+i); if(b) b.classList.remove('active');
+  });
+  document.getElementById(n===1?'bn1':'bn2').classList.add('active');
+}
+
+function goBackFromIndex() {
+  if (state.subj && state.subj.type==='direct') showPage(1);
+  else showPage(3);
+}
+
+// ═══════════════════════════════════════════════════
+//  GITHUB FETCH (credentials from localStorage)
+// ═══════════════════════════════════════════════════
+function b64_to_utf8(str) {
+  return decodeURIComponent(escape(window.atob(str.replace(/\s/g,''))));
+}
+
+async function fetchFile(filePath) {
+  if (!GH.owner || !GH.repo || !GH.token) return null;
+  if (state.cache[filePath]) return state.cache[filePath];
+  var url = 'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+filePath;
+  var res = await fetch(url, {
+    headers:{'Authorization':'token '+GH.token,'Accept':'application/vnd.github.v3+json'}
+  });
+  if (res.status===404) return null;
+  if (!res.ok) throw new Error('HTTP '+res.status);
+  var data = await res.json();
+  var parsed = JSON.parse(b64_to_utf8(data.content));
+  state.cache[filePath] = parsed;
+  return parsed;
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER HOME
+// ═══════════════════════════════════════════════════
+function renderHome() {
+  document.getElementById('subjGrid').innerHTML = SUBJECTS.map(function(s){
+    return '<div class="subj-card" onclick="openSubject(\''+s.id+'\')"><div class="sc-inner">'
+      +'<div class="sc-icon" style="background:'+s.bg+';color:'+s.color+'">'+s.icon+'</div>'
+      +'<div class="sc-info"><div class="sc-name" style="color:'+s.color+'">'+s.name+'</div></div>'
+      +'<div class="sc-chev">›</div></div></div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  OPEN SUBJECT
+// ═══════════════════════════════════════════════════
+function openSubject(id) {
+  var s = SUBJECTS.find(function(x){return x.id===id;});
+  if (!s) return;
+  state.subj = s;
+
+  if (s.type==='direct') {
+    state.cls={id:'none',name:''}; state.term={id:'none',name:''};
+    document.getElementById('p4Lbl').textContent  = s.name;
+    document.getElementById('p4Name').textContent = 'பட்டியல்';
+    showLoading();
+    showPage(4);
+
+    var cacheKey = s.prefix+'_direct';
+    if (state.cache[cacheKey]) {
+      state.lessonList = state.cache[cacheKey];
+      renderLessonIndex();
+      return;
+    }
+
+    // psy_l1.json, psy_l2.json... என்று 404 வரும்வரை fetch செய்
+    fetchAllLessons(s.prefix, '', '', 1, []).then(function(lessons){
+      if (lessons.length > 0) {
+        state.cache[cacheKey] = lessons;
+        state.lessonList = lessons;
+      } else {
+        state.lessonList = [fallback(id)];
+      }
+      renderLessonIndex();
+    }).catch(function(){ state.lessonList=[fallback(id)]; renderLessonIndex(); });
+    return;
+  }
+
+  document.getElementById('p2Name').textContent = s.name;
+  document.getElementById('classList').innerHTML = CLASSES.map(function(c){
+    return '<div class="menu-item" onclick="openClass(\''+c.id+'\')"><div class="mi-icon" style="background:'+s.bg+';color:'+s.color+'">🏫</div><div class="mi-title">'+c.name+'</div><div class="mi-chev">›</div></div>';
+  }).join('');
+  showPage(2);
+}
+
+function openClass(clsId) {
+  var c = CLASSES.find(function(x){return x.id===clsId;});
+  state.cls = c;
+  document.getElementById('p3Lbl').textContent  = state.subj.name;
+  document.getElementById('p3Name').textContent = c.name;
+  document.getElementById('termList').innerHTML = TERMS.map(function(t){
+    return '<div class="menu-item" onclick="openTerm(\''+t.id+'\')"><div class="mi-icon" style="background:'+state.subj.bg+';color:'+state.subj.color+'">📑</div><div class="mi-title">'+t.name+'</div><div class="mi-chev">›</div></div>';
+  }).join('');
+  showPage(3);
+}
+
+function openTerm(termId) {
+  var t = TERMS.find(function(x){return x.id===termId;});
+  state.term = t;
+  document.getElementById('p4Lbl').textContent  = state.subj.name+' ❯ '+state.cls.name;
+  document.getElementById('p4Name').textContent = t.name;
+  showLoading();
+  showPage(4);
+
+  // File format: data/tam_5_t1_l1.json
+  // prefix_classNum_termId_lNum.json
+  var prefix   = state.subj.prefix;
+  var clsNum   = state.cls.id.replace('c',''); // c5 → 5
+  var termStr  = t.id;                          // t1
+  var cacheKey = prefix+'_'+clsNum+'_'+termStr;
+
+  if (state.cache[cacheKey]) {
+    state.lessonList = state.cache[cacheKey];
+    renderLessonIndex();
+    return;
+  }
+
+  // l1, l2, l3... என்று 404 வரும்வரை fetch செய்
+  fetchAllLessons(prefix, clsNum, termStr, 1, []).then(function(lessons){
+    if (lessons.length > 0) {
+      state.cache[cacheKey] = lessons;
+      state.lessonList = lessons;
+    } else {
+      state.lessonList = [fallback('dummy')];
+    }
+    renderLessonIndex();
+  }).catch(function(){
+    state.lessonList = [fallback('dummy')];
+    renderLessonIndex();
+  });
+}
+
+// ஒவ்வொரு lesson file-ஐயும் l1,l2,l3... என்று fetch செய்யும்
+// 404 கிடைத்தால் நிறுத்திவிடும்
+// Direct subjects:     data/psy_l1.json      (clsNum='', termStr='')
+// Class-based:         data/tam_5_t1_l1.json  (clsNum='5', termStr='t1')
+async function fetchAllLessons(prefix, clsNum, termStr, lessonNum, collected) {
+  var parts = [prefix];
+  if (clsNum)  parts.push(clsNum);
+  if (termStr) parts.push(termStr);
+  parts.push('l' + lessonNum);
+  var fp  = 'data/' + parts.join('_') + '.json';
+  var url = 'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+fp;
+  try {
+    var res = await fetch(url, {
+      headers:{'Authorization':'token '+GH.token,'Accept':'application/vnd.github.v3+json'}
+    });
+    if (res.status===404) return collected; // இந்த lesson இல்லை — முடிந்தது
+    if (!res.ok) return collected;
+    var data   = await res.json();
+    var lesson = JSON.parse(b64_to_utf8(data.content));
+    collected.push(lesson);
+    return fetchAllLessons(prefix, clsNum, termStr, lessonNum+1, collected);
+  } catch(e) {
+    return collected;
+  }
+}
+
+function showLoading() {
+  document.getElementById('lessonList').innerHTML =
+    '<div class="loader-wrap"><div class="spinner"></div><div class="loader-msg">ஏற்றுகிறது...</div></div>';
+}
+
+function fallback(id) {
+  return {id:id+'_l1',title:'1. முழுப்பாடப்பகுதி',
+    material:[{title:'குறிப்புகள்',points:['Admin Panel வழியாக தரவை சேர்க்கவும்.']}],
+    quiz:[{q:'மாதிரி வினா?',opts:['அ','ஆ','இ','ஈ'],ans:0,expl:''}]};
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER LESSON INDEX
+// ═══════════════════════════════════════════════════
+function renderLessonIndex() {
+  var list = document.getElementById('lessonList');
+  if (!state.lessonList || state.lessonList.length===0) {
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-msg">பாடங்கள் விரைவில் பதிவேற்றப்படும்</div></div>';
+    return;
+  }
+  var sId=state.subj?state.subj.id:'', cId=state.cls?state.cls.id:'', tId=state.term?state.term.id:'';
+  list.innerHTML = state.lessonList.map(function(lesson, idx){
+    // lessonId = l1, l2, l3... (lesson index-based)
+    var lId = 'l' + (idx + 1);
+    var q = 'id='+lId+'&subj='+sId+'&cls='+cId+'&term='+tId;
+    return '<div class="lesson-card">'
+      +'<div class="lc-num">பாடம் '+(idx+1)+'</div>'
+      +'<div class="lc-title">'+lesson.title+'</div>'
+      +'<div class="lc-actions">'
+      +'<a class="lc-btn btn-mat"  href="material.html?'+q+'">📚 பாடக்குறிப்புகள்</a>'
+      +'<a class="lc-btn btn-quiz" href="quiz.html?'+q+'">✍️ தேர்வு</a>'
+      +'</div></div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  PAY MODAL
+// ═══════════════════════════════════════════════════
+function showPay(){ document.getElementById('payModal').classList.add('show'); }
+function hidePay(){ document.getElementById('payModal').classList.remove('show'); }
+function copyGPay(){
+  var num=document.getElementById('gpayNumber').innerText;
+  navigator.clipboard.writeText(num).catch(function(){});
+  showToast('📋 '+num+' நகலெடுக்கப்பட்டது!');
+  hidePay();
+}
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+// INIT
+renderHome();
+</script>
+</body>
+</html>

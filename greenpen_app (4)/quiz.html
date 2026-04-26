@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>தேர்வு – My Green Pen</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="quiz.css">
+<style>
+  /* Page-specific inline styles */
+  #quizResult  { display: none; }
+  #quizForm    { display: block; }
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- HEADER -->
+  <div class="app-header">
+    <div style="width:100%;position:relative;z-index:2;">
+      <span class="bname">MY GREEN PEN</span>
+      <span class="bsub">சிறப்பு ஆசிரியர் தகுதித்தேர்வு</span>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="subj-topbar">
+    <button class="back-btn" id="backBtn" onclick="goBack()">&#8592;</button>
+    <div class="topbar-info">
+      <div class="topbar-lbl" id="topLbl">மாதிரித் தேர்வு</div>
+      <div class="topbar-name" id="topName">ஏற்றுகிறது...</div>
+    </div>
+  </div>
+
+  <!-- SCROLLABLE CONTENT -->
+  <div class="page-area" id="pageArea">
+    <div class="inner-body" id="quizBody">
+      <!-- Loader -->
+      <div class="loader-wrap" id="loader">
+        <div class="spinner"></div>
+        <div class="loader-msg">தேர்வை ஏற்றுகிறது...</div>
+      </div>
+
+      <!-- Quiz form (filled dynamically) -->
+      <div id="quizForm" style="display:none;">
+        <!-- exam-header, progress, qcards, submit injected here -->
+      </div>
+
+      <!-- Result (shown after submit) -->
+      <div id="quizResult" style="display:none;">
+        <!-- result card injected here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="bnav-item" onclick="window.location.href='index.html'">
+      <div class="bnav-icon">🏠</div>
+      <div class="bnav-lbl">முகப்பு</div>
+    </div>
+    <div class="bnav-item" id="matNavBtn">
+      <div class="bnav-icon">📚</div>
+      <div class="bnav-lbl">குறிப்புகள்</div>
+    </div>
+    <div class="bnav-item" onclick="window.location.href='tel:6369371452'">
+      <div class="bnav-icon">📞</div>
+      <div class="bnav-lbl">Contact</div>
+    </div>
+    <div class="bnav-item active">
+      <div class="bnav-icon">✍️</div>
+      <div class="bnav-lbl">தேர்வு</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  URL PARAMS
+// ═══════════════════════════════════════════════════
+var params   = new URLSearchParams(window.location.search);
+var lessonId = params.get('id');
+var subjId   = params.get('subj');
+var clsId    = params.get('cls');
+var termId   = params.get('term');
+
+var materialURL = 'material.html?id=' + lessonId + '&subj=' + subjId + '&cls=' + clsId + '&term=' + termId;
+document.getElementById('matNavBtn').onclick = function(){ window.location.href = materialURL; };
+
+function goBack() {
+  if (document.referrer) history.back();
+  else window.location.href = 'index.html';
+}
+
+// ═══════════════════════════════════════════════════
+//  GITHUB CONFIG
+// ═══════════════════════════════════════════════════
+var GH = {
+  owner: localStorage.getItem('gh_owner') || '',
+  repo:  localStorage.getItem('gh_repo')  || '',
+  token: localStorage.getItem('gh_token') || '',
+};
+
+function b64_to_utf8(str) {
+  return decodeURIComponent(escape(window.atob(str.replace(/\s/g, ''))));
+}
+
+// ═══════════════════════════════════════════════════
+//  EXAM STATE
+// ═══════════════════════════════════════════════════
+var examState = {
+  lesson:      null,
+  answers:     {},
+  submitted:   false,
+  timerHandle: null,
+  secsLeft:    1800
+};
+
+// ═══════════════════════════════════════════════════
+//  FETCH LESSON
+// ═══════════════════════════════════════════════════
+// Subject prefix map
+var PREFIX = {
+  'tamil':'tam','english':'eng','maths':'mat',
+  'evs':'evs','social':'soc',
+  'psychology':'psy','classes_678':'c678',
+  'revision_test':'rev','tet_mock_test':'tet'
+};
+
+var DIRECT_FILES = {
+  'psychology':   'data/psychology.json',
+  'revision_test':'data/revision_test.json',
+  'tet_mock_test':'data/tet_mock_test.json',
+  'classes_678':  'data/classes_678.json'
+};
+
+function getFilePath() {
+  var prefix = PREFIX[subjId] || subjId;
+  var clsNum = clsId && clsId !== 'none' ? clsId.replace('c','') : '';
+  var term   = termId && termId !== 'none' ? termId : '';
+
+  // Direct:      psy_l1.json
+  // Class-based: tam_5_t1_l1.json
+  var parts = [prefix];
+  if (clsNum) parts.push(clsNum);
+  if (term)   parts.push(term);
+  parts.push(lessonId); // l1, l2...
+  return 'data/' + parts.join('_') + '.json';
+}
+
+async function fetchLesson() {
+  if (!GH.owner || !GH.repo || !GH.token) {
+    showError('GitHub தரவு இணைப்பு இல்லை. Admin Panel-ல் அமைக்கவும்.');
+    return;
+  }
+  var filePath = getFilePath();
+  var url = 'https://api.github.com/repos/' + GH.owner + '/' + GH.repo + '/contents/' + filePath;
+  try {
+    var res = await fetch(url, {
+      headers: {
+        'Authorization': 'token ' + GH.token,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!res.ok) { showError('கோப்பு கிடைக்கவில்லை (' + res.status + ')'); return; }
+    var data   = await res.json();
+    var parsed = JSON.parse(b64_to_utf8(data.content));
+
+    // Direct subjects → array, find by id; class-based → single object
+    var lesson;
+    if (Array.isArray(parsed)) {
+      lesson = parsed.find(function(l){ return l.id === lessonId; }) || parsed[0];
+    } else {
+      lesson = parsed;
+    }
+
+    if (!lesson) { showError('பாடம் கிடைக்கவில்லை.'); return; }
+    examState.lesson = lesson;
+    renderQuiz(lesson);
+  } catch(e) {
+    showError('பிழை: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER QUIZ
+// ═══════════════════════════════════════════════════
+function renderQuiz(lesson) {
+  document.getElementById('topName').textContent = lesson.title;
+  document.getElementById('topLbl').textContent  = 'மாதிரித் தேர்வு';
+  document.title = 'தேர்வு – ' + lesson.title;
+
+  var qz = lesson.quiz || [];
+  if (qz.length === 0) {
+    showError('இப்பாடத்தில் வினாக்கள் இல்லை.');
+    return;
+  }
+
+  // Reset state
+  examState.answers   = {};
+  examState.submitted = false;
+  examState.secsLeft  = 1800;
+  if (examState.timerHandle) clearInterval(examState.timerHandle);
+
+  var letters = ['A','B','C','D'];
+
+  // Build HTML
+  var html = '';
+
+  // Sticky exam header
+  html += '<div class="exam-header">'
+        + '<div class="timer-wrap">'
+        +   '<div class="timer-lbl">மீதமுள்ள நேரம்</div>'
+        +   '<div class="exam-timer" id="examTimer">30:00</div>'
+        + '</div>'
+        + '<div class="exam-meta">'
+        +   '<div class="exam-meta-lbl">மொத்த வினாக்கள்</div>'
+        +   '<div class="exam-meta-count">' + qz.length + '</div>'
+        + '</div>'
+        + '</div>';
+
+  // Progress bar
+  html += '<div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>';
+
+  // Questions
+  html += qz.map(function(q, qi) {
+    return '<div class="qcard" id="qc' + qi + '">'
+         + '<div class="qcard-top">'
+         +   '<span class="qnum-badge">கேள்வி ' + (qi+1) + '</span>'
+         +   '<span class="qmark">1 மதிப்பெண்</span>'
+         + '</div>'
+         + '<div class="qtext">' + q.q + '</div>'
+         + '<div class="qopts">'
+         + q.opts.map(function(o, oi){
+             return '<button class="qopt" id="eo' + qi + '_' + oi + '" onclick="selectOpt(' + qi + ',' + oi + ')">'
+                  + '<span class="opt-letter">' + letters[oi] + '</span>' + o
+                  + '</button>';
+           }).join('')
+         + '</div>'
+         + '</div>';
+  }).join('');
+
+  html += '<button class="submit-btn" onclick="submitExam()">✅ தேர்வைச் சமர்ப்பி</button>';
+
+  var formEl = document.getElementById('quizForm');
+  formEl.innerHTML = html;
+  formEl.style.display = 'block';
+  document.getElementById('loader').style.display = 'none';
+
+  // Start timer
+  startTimer(qz);
+}
+
+// ═══════════════════════════════════════════════════
+//  TIMER
+// ═══════════════════════════════════════════════════
+function startTimer(qz) {
+  examState.timerHandle = setInterval(function(){
+    if (examState.submitted) { clearInterval(examState.timerHandle); return; }
+    if (examState.secsLeft <= 0) {
+      clearInterval(examState.timerHandle);
+      submitExam();
+      return;
+    }
+    examState.secsLeft--;
+    var m = Math.floor(examState.secsLeft / 60);
+    var s = examState.secsLeft % 60;
+    var el = document.getElementById('examTimer');
+    if (el) {
+      el.textContent = (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+      if (examState.secsLeft < 300) el.classList.add('warning');
+    }
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════════
+//  SELECT OPTION
+// ═══════════════════════════════════════════════════
+function selectOpt(qi, oi) {
+  if (examState.submitted) return;
+  examState.answers[qi] = oi;
+
+  var q = examState.lesson.quiz[qi];
+  for (var i = 0; i < q.opts.length; i++) {
+    var btn = document.getElementById('eo' + qi + '_' + i);
+    if (btn) {
+      btn.classList.remove('selected');
+      if (i === oi) btn.classList.add('selected');
+    }
+  }
+
+  // Update progress bar
+  var answered = Object.keys(examState.answers).length;
+  var total    = examState.lesson.quiz.length;
+  var bar = document.getElementById('progressBar');
+  if (bar) bar.style.width = Math.round(answered / total * 100) + '%';
+}
+
+// ═══════════════════════════════════════════════════
+//  SUBMIT EXAM
+// ═══════════════════════════════════════════════════
+function submitExam() {
+  if (examState.timerHandle) clearInterval(examState.timerHandle);
+  examState.submitted = true;
+
+  var allQ    = examState.lesson.quiz;
+  var correct = 0;
+  allQ.forEach(function(q, i){
+    if (examState.answers[i] === q.ans) correct++;
+  });
+
+  var pct   = Math.round(correct / allQ.length * 100);
+  var color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444';
+  var msg   = pct >= 80 ? '🎉 வாழ்த்துக்கள்! மிகச் சிறப்பு!'
+            : pct >= 60 ? '👍 நல்ல முயற்சி! தொடர்ந்து படியுங்கள்!'
+            :              '📚 இன்னும் பயிற்சி தேவை!';
+
+  var letters = ['A','B','C','D'];
+
+  // Result card
+  var html = '<div class="result-card">'
+    + '<div class="result-ring" style="--rc:' + color + ';--rp:' + pct + '%">'
+    +   '<div class="result-inner">'
+    +     '<div class="result-pct" style="color:' + color + '">' + pct + '%</div>'
+    +     '<div class="result-pct-lbl">மதிப்பெண்</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="result-msg">' + msg + '</div>'
+    + '<div class="result-sub">மொத்தம் ' + allQ.length + ' வினாக்களில் ' + correct + ' சரியானவை</div>'
+    + '<div class="result-grid">'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#10b981">' + correct + '</div><div class="rg-lbl">சரியானவை</div></div>'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#ef4444">' + (allQ.length - correct) + '</div><div class="rg-lbl">தவறானவை</div></div>'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#f59e0b">' + (allQ.length - Object.keys(examState.answers).length) + '</div><div class="rg-lbl">தவிர்த்தவை</div></div>'
+    + '</div>'
+    + '<button class="submit-btn retry" onclick="retryExam()">🔄 மீண்டும் முயற்சி செய்</button>'
+    + '<a class="submit-btn material" href="' + materialURL + '" style="display:block;margin-top:10px;text-align:center;text-decoration:none;">📚 பாடக்குறிப்புகள் படிக்க</a>'
+    + '</div>';
+
+  // Answer review
+  html += allQ.map(function(q, qi){
+    var userAns = examState.answers[qi];
+    return '<div class="qcard">'
+      + '<div class="qcard-top"><span class="qnum-badge">கேள்வி ' + (qi+1) + '</span></div>'
+      + '<div class="qtext">' + q.q + '</div>'
+      + '<div class="qopts">'
+      + q.opts.map(function(o, oi){
+          var cls = 'qopt';
+          if (oi === q.ans) cls += ' correct';
+          else if (oi === userAns && userAns !== q.ans) cls += ' wrong';
+          return '<button class="' + cls + '" disabled>'
+               + '<span class="opt-letter">' + letters[oi] + '</span>' + o
+               + '</button>';
+        }).join('')
+      + '</div>'
+      + (q.expl ? '<div class="qexpl show">💡 ' + q.expl + '</div>' : '')
+      + '</div>';
+  }).join('');
+
+  document.getElementById('quizForm').style.display  = 'none';
+  var resEl = document.getElementById('quizResult');
+  resEl.innerHTML = html;
+  resEl.style.display = 'block';
+  document.getElementById('pageArea').scrollTop = 0;
+}
+
+// ═══════════════════════════════════════════════════
+//  RETRY
+// ═══════════════════════════════════════════════════
+function retryExam() {
+  document.getElementById('quizResult').style.display = 'none';
+  document.getElementById('loader').style.display     = 'flex';
+  document.getElementById('quizForm').style.display   = 'none';
+  document.getElementById('pageArea').scrollTop       = 0;
+  renderQuiz(examState.lesson);
+}
+
+// ═══════════════════════════════════════════════════
+//  ERROR
+// ═══════════════════════════════════════════════════
+function showError(msg) {
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('quizBody').innerHTML +=
+    '<div class="empty-state">'
+    + '<div class="empty-icon">⚠️</div>'
+    + '<div class="empty-msg">' + msg + '</div>'
+    + '<div style="margin-top:16px;">'
+    +   '<button onclick="window.location.href=\'index.html\'" style="padding:10px 20px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);">← முகப்பிற்கு செல்</button>'
+    + '</div>'
+    + '</div>';
+}
+
+// INIT
+fetchLesson();
+</script>
+</body>
+</html>

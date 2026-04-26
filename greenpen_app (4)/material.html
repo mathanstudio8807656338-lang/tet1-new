@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>பாடக்குறிப்புகள் – My Green Pen</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="material.css">
+<style>
+  /* Page-specific inline overrides */
+  .app-wrapper { color: var(--text); }
+
+  /* Floating quiz shortcut */
+  .fab-quiz {
+    position: fixed;
+    bottom: 80px; right: calc(50% - 240px + 16px);
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--warning), #d97706);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 4px 14px rgba(217,119,6,0.45);
+    cursor: pointer;
+    z-index: 60;
+    text-decoration: none;
+    transition: transform 0.2s;
+    border: none;
+  }
+  .fab-quiz:active { transform: scale(0.92); }
+
+  /* Responsive FAB for narrow screens */
+  @media (max-width: 480px) {
+    .fab-quiz { right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- HEADER -->
+  <div class="app-header">
+    <div style="width:100%;position:relative;z-index:2;">
+      <span class="bname">MY GREEN PEN</span>
+      <span class="bsub">சிறப்பு ஆசிரியர் தகுதித்தேர்வு</span>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="subj-topbar">
+    <button class="back-btn" onclick="goBack()">&#8592;</button>
+    <div class="topbar-info">
+      <div class="topbar-lbl" id="topLbl">பாடக்குறிப்புகள்</div>
+      <div class="topbar-name" id="topName">ஏற்றுகிறது...</div>
+    </div>
+  </div>
+
+  <!-- SCROLLABLE CONTENT -->
+  <div class="page-area" id="pageArea">
+    <div class="inner-body" id="materialBody">
+      <!-- Loader -->
+      <div class="loader-wrap" id="loader">
+        <div class="spinner"></div>
+        <div class="loader-msg">பாடக்குறிப்புகளை ஏற்றுகிறது...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="bnav-item" onclick="goBack()">
+      <div class="bnav-icon">🏠</div>
+      <div class="bnav-lbl">முகப்பு</div>
+    </div>
+    <div class="bnav-item active">
+      <div class="bnav-icon">📚</div>
+      <div class="bnav-lbl">குறிப்புகள்</div>
+    </div>
+    <div class="bnav-item" onclick="window.location.href='tel:6369371452'">
+      <div class="bnav-icon">📞</div>
+      <div class="bnav-lbl">Contact</div>
+    </div>
+    <div class="bnav-item" id="quizNavBtn">
+      <div class="bnav-icon">✍️</div>
+      <div class="bnav-lbl">தேர்வு</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+</div><!-- end app-wrapper -->
+
+<!-- Floating Quiz Button -->
+<a class="fab-quiz" id="fabQuiz" href="#" title="தேர்வு எழுத">✍️</a>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  URL PARAMS
+// ═══════════════════════════════════════════════════
+var params  = new URLSearchParams(window.location.search);
+var lessonId = params.get('id');
+var subjId   = params.get('subj');
+var clsId    = params.get('cls');
+var termId   = params.get('term');
+
+// Quiz page link
+var quizURL = 'quiz.html?id=' + lessonId + '&subj=' + subjId + '&cls=' + clsId + '&term=' + termId;
+document.getElementById('fabQuiz').href = quizURL;
+document.getElementById('quizNavBtn').onclick = function(){ window.location.href = quizURL; };
+
+// Back navigation
+function goBack() {
+  if (document.referrer && document.referrer.includes('index.html')) {
+    history.back();
+  } else {
+    window.location.href = 'index.html';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  GITHUB CONFIG
+// ═══════════════════════════════════════════════════
+var GH = {
+  owner: localStorage.getItem('gh_owner') || '',
+  repo:  localStorage.getItem('gh_repo')  || '',
+  token: localStorage.getItem('gh_token') || '',
+};
+
+function b64_to_utf8(str) {
+  return decodeURIComponent(escape(window.atob(str.replace(/\s/g, ''))));
+}
+
+// ═══════════════════════════════════════════════════
+//  FETCH LESSON DATA
+// ═══════════════════════════════════════════════════
+// Subject prefix map
+var PREFIX = {
+  'tamil':'tam','english':'eng','maths':'mat',
+  'evs':'evs','social':'soc',
+  'psychology':'psy','classes_678':'c678',
+  'revision_test':'rev','tet_mock_test':'tet'
+};
+
+var DIRECT_FILES = {
+  'psychology':   'data/psychology.json',
+  'revision_test':'data/revision_test.json',
+  'tet_mock_test':'data/tet_mock_test.json',
+  'classes_678':  'data/classes_678.json'
+};
+
+function getFilePath() {
+  var prefix = PREFIX[subjId] || subjId;
+  var clsNum = clsId && clsId !== 'none' ? clsId.replace('c','') : '';
+  var term   = termId && termId !== 'none' ? termId : '';
+
+  // File name: parts join by '_'
+  // Direct:      psy_l1.json      (no cls, no term)
+  // Class-based: tam_5_t1_l1.json
+  var parts = [prefix];
+  if (clsNum) parts.push(clsNum);
+  if (term)   parts.push(term);
+  parts.push(lessonId); // l1, l2...
+  return 'data/' + parts.join('_') + '.json';
+}
+
+async function fetchLesson() {
+  if (!GH.owner || !GH.repo || !GH.token) {
+    showError('GitHub தரவு இணைப்பு இல்லை. Admin Panel-ல் அமைக்கவும்.');
+    return;
+  }
+
+  var filePath = getFilePath();
+  var url = 'https://api.github.com/repos/' + GH.owner + '/' + GH.repo + '/contents/' + filePath;
+
+  try {
+    var res = await fetch(url, {
+      headers: {
+        'Authorization': 'token ' + GH.token,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (!res.ok) {
+      showError('கோப்பு கிடைக்கவில்லை (' + res.status + ')');
+      return;
+    }
+
+    var data   = await res.json();
+    var parsed = JSON.parse(b64_to_utf8(data.content));
+
+    // Direct subjects-ல் array இருக்கும் — lessonId-ஆல் find செய்
+    // Class-based-ல் single object — நேரடியாக பயன்படுத்து
+    var lesson;
+    if (Array.isArray(parsed)) {
+      lesson = parsed.find(function(l){ return l.id === lessonId; }) || parsed[0];
+    } else {
+      lesson = parsed;
+    }
+
+    if (!lesson) {
+      showError('பாடம் கிடைக்கவில்லை.');
+      return;
+    }
+
+    renderMaterial(lesson);
+    }
+
+    renderMaterial(lesson);
+
+  } catch(e) {
+    showError('பிழை: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER MATERIAL
+// ═══════════════════════════════════════════════════
+function renderMaterial(lesson) {
+  document.getElementById('topName').textContent = lesson.title;
+  document.title = lesson.title + ' – My Green Pen';
+
+  var mats = lesson.material || [];
+  var body = document.getElementById('materialBody');
+
+  if (mats.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-msg">குறிப்புகள் இல்லை</div></div>';
+    return;
+  }
+
+  var html = '';
+
+  // Lesson header card
+  html += '<div class="lesson-header">'
+        + '<div class="lesson-header-icon">📚</div>'
+        + '<div>'
+        +   '<div class="lesson-header-title">' + lesson.title + '</div>'
+        +   '<div class="lesson-header-sub">' + mats.length + ' பகுதிகள்</div>'
+        + '</div>'
+        + '</div>';
+
+  // Material sections
+  html += mats.map(function(sec, idx) {
+    var bodyHtml = '';
+    if (sec.content) {
+      // Rich HTML content from JSON
+      bodyHtml = '<div class="material-content">' + sec.content + '</div>';
+    } else if (sec.points && sec.points.length > 0) {
+      // Simple bullet points
+      bodyHtml = sec.points.map(function(p){
+        return '<div class="material-point">' + p + '</div>';
+      }).join('');
+    }
+
+    return '<div class="material-section">'
+         + '<div class="section-count">பகுதி ' + (idx+1) + '</div>'
+         + '<div class="material-title">' + sec.title + '</div>'
+         + bodyHtml
+         + '</div>';
+  }).join('');
+
+  // Go to Quiz button at bottom
+  html += '<a class="goto-quiz-btn" href="' + quizURL + '">✍️ இப்போதே தேர்வு எழுதுங்கள் →</a>';
+
+  body.innerHTML = html;
+}
+
+function showError(msg) {
+  document.getElementById('materialBody').innerHTML =
+    '<div class="empty-state">'
+    + '<div class="empty-icon">⚠️</div>'
+    + '<div class="empty-msg">' + msg + '</div>'
+    + '<div style="margin-top:16px;">'
+    +   '<button onclick="window.location.href=\'index.html\'" style="padding:10px 20px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);">← முகப்பிற்கு செல்</button>'
+    + '</div>'
+    + '</div>';
+}
+
+// INIT
+fetchLesson();
+</script>
+</body>
+</html>
