@@ -3,7 +3,7 @@
    All pages share these base styles
 ═══════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@300;400;500;600;700;800&display=swap');
+/* Offline mode: system Tamil font பயன்படுத்துகிறோம் */
 
 /* ── CSS VARIABLES ── */
 :root {

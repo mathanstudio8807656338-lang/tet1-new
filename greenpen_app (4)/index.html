@@ -186,23 +186,14 @@ function goBackFromIndex() {
 }
 
 // ═══════════════════════════════════════════════════
-//  GITHUB FETCH (credentials from localStorage)
+//  LOCAL FETCH (offline mode)
 // ═══════════════════════════════════════════════════
-function b64_to_utf8(str) {
-  return decodeURIComponent(escape(window.atob(str.replace(/\s/g,''))));
-}
-
 async function fetchFile(filePath) {
-  if (!GH.owner || !GH.repo || !GH.token) return null;
   if (state.cache[filePath]) return state.cache[filePath];
-  var url = 'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+filePath;
-  var res = await fetch(url, {
-    headers:{'Authorization':'token '+GH.token,'Accept':'application/vnd.github.v3+json'}
-  });
-  if (res.status===404) return null;
-  if (!res.ok) throw new Error('HTTP '+res.status);
-  var data = await res.json();
-  var parsed = JSON.parse(b64_to_utf8(data.content));
+  var res = await fetch(filePath);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var parsed = await res.json();
   state.cache[filePath] = parsed;
   return parsed;
 }
@@ -318,15 +309,11 @@ async function fetchAllLessons(prefix, clsNum, termStr, lessonNum, collected) {
   if (termStr) parts.push(termStr);
   parts.push('l' + lessonNum);
   var fp  = 'data/' + parts.join('_') + '.json';
-  var url = 'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+fp;
   try {
-    var res = await fetch(url, {
-      headers:{'Authorization':'token '+GH.token,'Accept':'application/vnd.github.v3+json'}
-    });
+    var res = await fetch(fp);
     if (res.status===404) return collected; // இந்த lesson இல்லை — முடிந்தது
     if (!res.ok) return collected;
-    var data   = await res.json();
-    var lesson = JSON.parse(b64_to_utf8(data.content));
+    var lesson = await res.json();
     // lesson_meta format அல்லது direct object — இரண்டும் வேலை செய்யும்
     collected.push(lesson);
     return fetchAllLessons(prefix, clsNum, termStr, lessonNum+1, collected);

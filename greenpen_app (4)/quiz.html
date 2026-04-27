@@ -156,22 +156,11 @@ function getFilePath() {
 }
 
 async function fetchLesson() {
-  if (!GH.owner || !GH.repo || !GH.token) {
-    showError('GitHub தரவு இணைப்பு இல்லை. Admin Panel-ல் அமைக்கவும்.');
-    return;
-  }
   var filePath = getFilePath();
-  var url = 'https://api.github.com/repos/' + GH.owner + '/' + GH.repo + '/contents/' + filePath;
   try {
-    var res = await fetch(url, {
-      headers: {
-        'Authorization': 'token ' + GH.token,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
+    var res = await fetch(filePath);
     if (!res.ok) { showError('கோப்பு கிடைக்கவில்லை (' + res.status + ')'); return; }
-    var data   = await res.json();
-    var parsed = JSON.parse(b64_to_utf8(data.content));
+    var parsed = await res.json();
 
     var lesson;
     if (Array.isArray(parsed)) {
