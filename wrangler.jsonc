@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tet1-new",
+  "compatibility_date": "2026-04-27",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "greenpen_app (4)"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
