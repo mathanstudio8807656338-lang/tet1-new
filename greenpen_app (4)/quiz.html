@@ -173,10 +173,11 @@ async function fetchLesson() {
     var data   = await res.json();
     var parsed = JSON.parse(b64_to_utf8(data.content));
 
-    // Direct subjects → array, find by id; class-based → single object
     var lesson;
     if (Array.isArray(parsed)) {
-      lesson = parsed.find(function(l){ return l.id === lessonId; }) || parsed[0];
+      lesson = parsed.find(function(l){
+        return (l.lesson_meta && l.lesson_meta.code === lessonId) || l.id === lessonId;
+      }) || parsed[0];
     } else {
       lesson = parsed;
     }
@@ -190,40 +191,50 @@ async function fetchLesson() {
 }
 
 // ═══════════════════════════════════════════════════
+//  HELPERS — JSON format normalize செய்யும்
+//  புதிய: quiz.questions[].question/options/answer/explanation
+//  பழைய: quiz[].q/opts/ans/expl
+// ═══════════════════════════════════════════════════
+function getQuestions(lesson) {
+  if (lesson.quiz && lesson.quiz.questions) return lesson.quiz.questions; // புதிய format
+  if (Array.isArray(lesson.quiz)) return lesson.quiz;                     // பழைய format
+  return [];
+}
+function getQ(q)    { return q.question  || q.q    || ''; }
+function getOpts(q) { return q.options   || q.opts || []; }
+function getAns(q)  { return q.answer    !== undefined ? q.answer : q.ans; }
+function getExpl(q) { return q.explanation || q.expl || ''; }
+function getTitle(lesson) {
+  return (lesson.lesson_meta && lesson.lesson_meta.title) || lesson.title || 'தேர்வு';
+}
+
+// ═══════════════════════════════════════════════════
 //  RENDER QUIZ
 // ═══════════════════════════════════════════════════
 function renderQuiz(lesson) {
-  document.getElementById('topName').textContent = lesson.title;
+  var title = getTitle(lesson);
+  var qz    = getQuestions(lesson);
+
+  document.getElementById('topName').textContent = title;
   document.getElementById('topLbl').textContent  = 'மாதிரித் தேர்வு';
-  document.title = 'தேர்வு – ' + lesson.title;
+  document.title = 'தேர்வு – ' + title;
 
-  var qz = lesson.quiz || [];
-  if (qz.length === 0) {
-    showError('இப்பாடத்தில் வினாக்கள் இல்லை.');
-    return;
-  }
+  if (qz.length === 0) { showError('இப்பாடத்தில் வினாக்கள் இல்லை.'); return; }
 
-  // Reset state
   examState.answers   = {};
   examState.submitted = false;
   examState.secsLeft  = 1800;
   if (examState.timerHandle) clearInterval(examState.timerHandle);
 
   var letters = ['A','B','C','D'];
-
-  // Build HTML
   var html = '';
 
-  // Sticky exam header
+  // Timer header
   html += '<div class="exam-header">'
-        + '<div class="timer-wrap">'
-        +   '<div class="timer-lbl">மீதமுள்ள நேரம்</div>'
-        +   '<div class="exam-timer" id="examTimer">30:00</div>'
-        + '</div>'
-        + '<div class="exam-meta">'
-        +   '<div class="exam-meta-lbl">மொத்த வினாக்கள்</div>'
-        +   '<div class="exam-meta-count">' + qz.length + '</div>'
-        + '</div>'
+        + '<div class="timer-wrap"><div class="timer-lbl">மீதமுள்ள நேரம்</div>'
+        +   '<div class="exam-timer" id="examTimer">30:00</div></div>'
+        + '<div class="exam-meta"><div class="exam-meta-lbl">மொத்த வினாக்கள்</div>'
+        +   '<div class="exam-meta-count">' + qz.length + '</div></div>'
         + '</div>';
 
   // Progress bar
@@ -236,15 +247,13 @@ function renderQuiz(lesson) {
          +   '<span class="qnum-badge">கேள்வி ' + (qi+1) + '</span>'
          +   '<span class="qmark">1 மதிப்பெண்</span>'
          + '</div>'
-         + '<div class="qtext">' + q.q + '</div>'
+         + '<div class="qtext">' + getQ(q) + '</div>'
          + '<div class="qopts">'
-         + q.opts.map(function(o, oi){
-             return '<button class="qopt" id="eo' + qi + '_' + oi + '" onclick="selectOpt(' + qi + ',' + oi + ')">'
-                  + '<span class="opt-letter">' + letters[oi] + '</span>' + o
-                  + '</button>';
+         + getOpts(q).map(function(o, oi){
+             return '<button class="qopt" id="eo'+qi+'_'+oi+'" onclick="selectOpt('+qi+','+oi+')">'
+                  + '<span class="opt-letter">'+letters[oi]+'</span>' + o + '</button>';
            }).join('')
-         + '</div>'
-         + '</div>';
+         + '</div></div>';
   }).join('');
 
   html += '<button class="submit-btn" onclick="submitExam()">✅ தேர்வைச் சமர்ப்பி</button>';
@@ -253,8 +262,6 @@ function renderQuiz(lesson) {
   formEl.innerHTML = html;
   formEl.style.display = 'block';
   document.getElementById('loader').style.display = 'none';
-
-  // Start timer
   startTimer(qz);
 }
 
@@ -264,17 +271,13 @@ function renderQuiz(lesson) {
 function startTimer(qz) {
   examState.timerHandle = setInterval(function(){
     if (examState.submitted) { clearInterval(examState.timerHandle); return; }
-    if (examState.secsLeft <= 0) {
-      clearInterval(examState.timerHandle);
-      submitExam();
-      return;
-    }
+    if (examState.secsLeft <= 0) { clearInterval(examState.timerHandle); submitExam(); return; }
     examState.secsLeft--;
     var m = Math.floor(examState.secsLeft / 60);
     var s = examState.secsLeft % 60;
     var el = document.getElementById('examTimer');
     if (el) {
-      el.textContent = (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+      el.textContent = (m<10?'0'+m:m) + ':' + (s<10?'0'+s:s);
       if (examState.secsLeft < 300) el.classList.add('warning');
     }
   }, 1000);
@@ -286,21 +289,15 @@ function startTimer(qz) {
 function selectOpt(qi, oi) {
   if (examState.submitted) return;
   examState.answers[qi] = oi;
-
-  var q = examState.lesson.quiz[qi];
-  for (var i = 0; i < q.opts.length; i++) {
-    var btn = document.getElementById('eo' + qi + '_' + i);
-    if (btn) {
-      btn.classList.remove('selected');
-      if (i === oi) btn.classList.add('selected');
-    }
+  var qz = getQuestions(examState.lesson);
+  var q  = qz[qi];
+  for (var i = 0; i < getOpts(q).length; i++) {
+    var btn = document.getElementById('eo'+qi+'_'+i);
+    if (btn) { btn.classList.remove('selected'); if (i===oi) btn.classList.add('selected'); }
   }
-
-  // Update progress bar
   var answered = Object.keys(examState.answers).length;
-  var total    = examState.lesson.quiz.length;
   var bar = document.getElementById('progressBar');
-  if (bar) bar.style.width = Math.round(answered / total * 100) + '%';
+  if (bar) bar.style.width = Math.round(answered / qz.length * 100) + '%';
 }
 
 // ═══════════════════════════════════════════════════
@@ -310,10 +307,10 @@ function submitExam() {
   if (examState.timerHandle) clearInterval(examState.timerHandle);
   examState.submitted = true;
 
-  var allQ    = examState.lesson.quiz;
+  var allQ    = getQuestions(examState.lesson);
   var correct = 0;
   allQ.forEach(function(q, i){
-    if (examState.answers[i] === q.ans) correct++;
+    if (examState.answers[i] === getAns(q)) correct++;
   });
 
   var pct   = Math.round(correct / allQ.length * 100);
@@ -321,49 +318,47 @@ function submitExam() {
   var msg   = pct >= 80 ? '🎉 வாழ்த்துக்கள்! மிகச் சிறப்பு!'
             : pct >= 60 ? '👍 நல்ல முயற்சி! தொடர்ந்து படியுங்கள்!'
             :              '📚 இன்னும் பயிற்சி தேவை!';
-
   var letters = ['A','B','C','D'];
 
-  // Result card
   var html = '<div class="result-card">'
-    + '<div class="result-ring" style="--rc:' + color + ';--rp:' + pct + '%">'
+    + '<div class="result-ring" style="--rc:'+color+';--rp:'+pct+'%">'
     +   '<div class="result-inner">'
-    +     '<div class="result-pct" style="color:' + color + '">' + pct + '%</div>'
+    +     '<div class="result-pct" style="color:'+color+'">'+pct+'%</div>'
     +     '<div class="result-pct-lbl">மதிப்பெண்</div>'
-    +   '</div>'
-    + '</div>'
-    + '<div class="result-msg">' + msg + '</div>'
-    + '<div class="result-sub">மொத்தம் ' + allQ.length + ' வினாக்களில் ' + correct + ' சரியானவை</div>'
+    +   '</div></div>'
+    + '<div class="result-msg">'+msg+'</div>'
+    + '<div class="result-sub">மொத்தம் '+allQ.length+' வினாக்களில் '+correct+' சரியானவை</div>'
     + '<div class="result-grid">'
-    +   '<div class="rg-item"><div class="rg-num" style="color:#10b981">' + correct + '</div><div class="rg-lbl">சரியானவை</div></div>'
-    +   '<div class="rg-item"><div class="rg-num" style="color:#ef4444">' + (allQ.length - correct) + '</div><div class="rg-lbl">தவறானவை</div></div>'
-    +   '<div class="rg-item"><div class="rg-num" style="color:#f59e0b">' + (allQ.length - Object.keys(examState.answers).length) + '</div><div class="rg-lbl">தவிர்த்தவை</div></div>'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#10b981">'+correct+'</div><div class="rg-lbl">சரியானவை</div></div>'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#ef4444">'+(allQ.length-correct)+'</div><div class="rg-lbl">தவறானவை</div></div>'
+    +   '<div class="rg-item"><div class="rg-num" style="color:#f59e0b">'+(allQ.length-Object.keys(examState.answers).length)+'</div><div class="rg-lbl">தவிர்த்தவை</div></div>'
     + '</div>'
     + '<button class="submit-btn retry" onclick="retryExam()">🔄 மீண்டும் முயற்சி செய்</button>'
-    + '<a class="submit-btn material" href="' + materialURL + '" style="display:block;margin-top:10px;text-align:center;text-decoration:none;">📚 பாடக்குறிப்புகள் படிக்க</a>'
+    + '<a class="submit-btn material" href="'+materialURL+'" style="display:block;margin-top:10px;text-align:center;text-decoration:none;">📚 பாடக்குறிப்புகள் படிக்க</a>'
     + '</div>';
 
   // Answer review
   html += allQ.map(function(q, qi){
     var userAns = examState.answers[qi];
+    var ans     = getAns(q);
+    var opts    = getOpts(q);
+    var expl    = getExpl(q);
     return '<div class="qcard">'
-      + '<div class="qcard-top"><span class="qnum-badge">கேள்வி ' + (qi+1) + '</span></div>'
-      + '<div class="qtext">' + q.q + '</div>'
+      + '<div class="qcard-top"><span class="qnum-badge">கேள்வி '+(qi+1)+'</span></div>'
+      + '<div class="qtext">'+getQ(q)+'</div>'
       + '<div class="qopts">'
-      + q.opts.map(function(o, oi){
+      + opts.map(function(o, oi){
           var cls = 'qopt';
-          if (oi === q.ans) cls += ' correct';
-          else if (oi === userAns && userAns !== q.ans) cls += ' wrong';
-          return '<button class="' + cls + '" disabled>'
-               + '<span class="opt-letter">' + letters[oi] + '</span>' + o
-               + '</button>';
+          if (oi===ans) cls += ' correct';
+          else if (oi===userAns && userAns!==ans) cls += ' wrong';
+          return '<button class="'+cls+'" disabled><span class="opt-letter">'+letters[oi]+'</span>'+o+'</button>';
         }).join('')
       + '</div>'
-      + (q.expl ? '<div class="qexpl show">💡 ' + q.expl + '</div>' : '')
+      + (expl ? '<div class="qexpl show">💡 '+expl+'</div>' : '')
       + '</div>';
   }).join('');
 
-  document.getElementById('quizForm').style.display  = 'none';
+  document.getElementById('quizForm').style.display = 'none';
   var resEl = document.getElementById('quizResult');
   resEl.innerHTML = html;
   resEl.style.display = 'block';

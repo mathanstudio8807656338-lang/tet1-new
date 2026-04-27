@@ -327,6 +327,7 @@ async function fetchAllLessons(prefix, clsNum, termStr, lessonNum, collected) {
     if (!res.ok) return collected;
     var data   = await res.json();
     var lesson = JSON.parse(b64_to_utf8(data.content));
+    // lesson_meta format அல்லது direct object — இரண்டும் வேலை செய்யும்
     collected.push(lesson);
     return fetchAllLessons(prefix, clsNum, termStr, lessonNum+1, collected);
   } catch(e) {
@@ -361,7 +362,7 @@ function renderLessonIndex() {
     var q = 'id='+lId+'&subj='+sId+'&cls='+cId+'&term='+tId;
     return '<div class="lesson-card">'
       +'<div class="lc-num">பாடம் '+(idx+1)+'</div>'
-      +'<div class="lc-title">'+lesson.title+'</div>'
+      +'<div class="lc-title">'+(lesson.lesson_meta ? lesson.lesson_meta.title : lesson.title)+'</div>'
       +'<div class="lc-actions">'
       +'<a class="lc-btn btn-mat"  href="material.html?'+q+'">📚 பாடக்குறிப்புகள்</a>'
       +'<a class="lc-btn btn-quiz" href="quiz.html?'+q+'">✍️ தேர்வு</a>'

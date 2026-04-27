@@ -191,23 +191,17 @@ async function fetchLesson() {
     var data   = await res.json();
     var parsed = JSON.parse(b64_to_utf8(data.content));
 
-    // Direct subjects-ல் array இருக்கும் — lessonId-ஆல் find செய்
-    // Class-based-ல் single object — நேரடியாக பயன்படுத்து
+    // Array ஆக இருந்தால் find செய், இல்லாவிட்டால் நேரடியாக பயன்படுத்து
     var lesson;
     if (Array.isArray(parsed)) {
-      lesson = parsed.find(function(l){ return l.id === lessonId; }) || parsed[0];
+      lesson = parsed.find(function(l){
+        return (l.lesson_meta && l.lesson_meta.code === lessonId) || l.id === lessonId;
+      }) || parsed[0];
     } else {
       lesson = parsed;
     }
 
-    if (!lesson) {
-      showError('பாடம் கிடைக்கவில்லை.');
-      return;
-    }
-
-    renderMaterial(lesson);
-    }
-
+    if (!lesson) { showError('பாடம் கிடைக்கவில்லை.'); return; }
     renderMaterial(lesson);
 
   } catch(e) {
@@ -216,16 +210,20 @@ async function fetchLesson() {
 }
 
 // ═══════════════════════════════════════════════════
-//  RENDER MATERIAL
+//  RENDER MATERIAL — JSON format:
+//  lesson_meta.title, material.sections[], quiz.questions[]
 // ═══════════════════════════════════════════════════
 function renderMaterial(lesson) {
-  document.getElementById('topName').textContent = lesson.title;
-  document.title = lesson.title + ' – My Green Pen';
+  // lesson_meta.title அல்லது lesson.title எதுவாக இருந்தாலும் வேலை செய்யும்
+  var title = (lesson.lesson_meta && lesson.lesson_meta.title) || lesson.title || 'பாடம்';
+  var sections = (lesson.material && lesson.material.sections) || lesson.material || [];
 
-  var mats = lesson.material || [];
+  document.getElementById('topName').textContent = title;
+  document.title = title + ' – My Green Pen';
+
   var body = document.getElementById('materialBody');
 
-  if (mats.length === 0) {
+  if (!sections || sections.length === 0) {
     body.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-msg">குறிப்புகள் இல்லை</div></div>';
     return;
   }
@@ -236,24 +234,21 @@ function renderMaterial(lesson) {
   html += '<div class="lesson-header">'
         + '<div class="lesson-header-icon">📚</div>'
         + '<div>'
-        +   '<div class="lesson-header-title">' + lesson.title + '</div>'
-        +   '<div class="lesson-header-sub">' + mats.length + ' பகுதிகள்</div>'
+        +   '<div class="lesson-header-title">' + title + '</div>'
+        +   '<div class="lesson-header-sub">' + sections.length + ' பகுதிகள்</div>'
         + '</div>'
         + '</div>';
 
   // Material sections
-  html += mats.map(function(sec, idx) {
+  html += sections.map(function(sec, idx) {
     var bodyHtml = '';
     if (sec.content) {
-      // Rich HTML content from JSON
       bodyHtml = '<div class="material-content">' + sec.content + '</div>';
     } else if (sec.points && sec.points.length > 0) {
-      // Simple bullet points
       bodyHtml = sec.points.map(function(p){
         return '<div class="material-point">' + p + '</div>';
       }).join('');
     }
-
     return '<div class="material-section">'
          + '<div class="section-count">பகுதி ' + (idx+1) + '</div>'
          + '<div class="material-title">' + sec.title + '</div>'
@@ -261,7 +256,7 @@ function renderMaterial(lesson) {
          + '</div>';
   }).join('');
 
-  // Go to Quiz button at bottom
+  // Go to Quiz button
   html += '<a class="goto-quiz-btn" href="' + quizURL + '">✍️ இப்போதே தேர்வு எழுதுங்கள் →</a>';
 
   body.innerHTML = html;
